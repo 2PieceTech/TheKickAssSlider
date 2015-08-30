@@ -89,7 +89,7 @@ void loop() {
   }
 }
 
-void updateMotorSpeed(Servo& motor, unsigned char speed) {
+void updateMotorSpeed(Servo& motor, char speed) {
   int microSeconds = map(speed, -128, 127, 1000, 2000);
 
   motor.writeMicroseconds(microSeconds);
