@@ -15,19 +15,19 @@ process.stdin.on('keypress', function (ch, key) {
   console.log(key.name);
 
   if (key.name === 'q') {
-    setMotor([0, 0, 0, 0]);
+    setMotors([0, 0, 0, 0]);
   } else if (key.name === 'up') {
-    setMotor([FORWARD, 0, BACKWARD, 0]);
+    setMotors([FORWARD, 0, BACKWARD, 0]);
   } else if (key.name === 'down') {
-    setMotor([BACKWARD, 0, FORWARD, 0]);
+    setMotors([BACKWARD, 0, FORWARD, 0]);
   } else if (key.name === 'left') {
-    setMotor([0, FORWARD, 0, BACKWARD]);
+    setMotors([0, FORWARD, 0, BACKWARD]);
   } else if (key.name === 'right') {
-    setMotor([0, BACKWARD, 0, FORWARD]);
-  } else if (key.name === 'r') {
-    setMotor([FORWARD, FORWARD, FORWARD, FORWARD]);
+    setMotors([0, BACKWARD, 0, FORWARD]);
   } else if (key.name === 'l') {
-    setMotor([BACKWARD, BACKWARD, BACKWARD, BACKWARD]);
+    setMotors([FORWARD, FORWARD, FORWARD, FORWARD]);
+  } else if (key.name === 'r') {
+    setMotors([BACKWARD, BACKWARD, BACKWARD, BACKWARD]);
   }
 
 
@@ -48,17 +48,17 @@ noble.on('stateChange', function(state) {
   }
 });
 
-var motorCharacteristics = null;
+var motorCharacteristic = null;
 
-function setMotor(speeds) {
-  if (motorCharacteristics) {
+function setMotors(speeds) {
+  if (motorCharacteristic) {
+    var data = new Buffer(4);
+
     for (var i = 0; i < speeds.length; i++) {
-      var buffer = new Buffer(1);
-
-      buffer.writeInt8(speeds[i], 0);
-
-      motorCharacteristics[i].write(buffer);
+      data.writeInt8(speeds[i], i);
     }
+
+    motorCharacteristic.write(data);
   }
 }
 
@@ -70,12 +70,7 @@ noble.on('discover', function(peripheral) {
   peripheral.connect(function() {
     peripheral.discoverSomeServicesAndCharacteristics(['51d0'], [], function(error, services, characteristics) {
 
-      motorCharacteristics = characteristics;
-
-
-      // peripheral.disconnect(function() {
-      //   process.exit(0);
-      // });
+      motorCharacteristic = characteristics[0];
     });
   });
 });
