@@ -2,7 +2,9 @@
 #include <SPI.h>
 #include <BLEPeripheral.h>
 
-#include <Servo.h> 
+#include <Servo.h>
+
+#include "Motor.h"
 
 // define pins (varies per shield/board)
 #define BLE_REQ   9
@@ -21,23 +23,18 @@ BLEPeripheral            blePeripheral        = BLEPeripheral(BLE_REQ, BLE_RDY, 
 BLEService               sliderService           = BLEService("51d0");
 
 // create motor characteristics
-BLECharCharacteristic    motor1Characteristic = BLECharCharacteristic("51d1", BLERead | BLEWrite);
-BLECharCharacteristic    motor2Characteristic = BLECharCharacteristic("51d2", BLERead | BLEWrite);
-BLECharCharacteristic    motor3Characteristic = BLECharCharacteristic("51d3", BLERead | BLEWrite);
-BLECharCharacteristic    motor4Characteristic = BLECharCharacteristic("51d4", BLERead | BLEWrite);
+BLEUnsignedLongCharacteristic motorCharacteristic = BLEUnsignedLongCharacteristic("51d1", BLERead | BLEWrite);
 
-Servo motor1;
-Servo motor2;
-Servo motor3;
-Servo motor4;
+#define NUM_MOTORS 4
+Motor motors[NUM_MOTORS];
 
 void setup() {
   Serial.begin(9600);
 
-  motor1.attach(MOTOR_1_CONTROL_PIN);
-  motor2.attach(MOTOR_2_CONTROL_PIN);
-  motor3.attach(MOTOR_3_CONTROL_PIN);
-  motor4.attach(MOTOR_4_CONTROL_PIN);
+  motors[0].attach(MOTOR_1_CONTROL_PIN);
+  motors[1].attach(MOTOR_2_CONTROL_PIN);
+  motors[2].attach(MOTOR_3_CONTROL_PIN);
+  motors[3].attach(MOTOR_4_CONTROL_PIN);
 
   // set advertised local name and service UUID
   blePeripheral.setLocalName("TheKickAssSlider");
@@ -45,10 +42,14 @@ void setup() {
 
   // add service and characteristic
   blePeripheral.addAttribute(sliderService);
-  blePeripheral.addAttribute(motor1Characteristic);
-  blePeripheral.addAttribute(motor2Characteristic);
-  blePeripheral.addAttribute(motor3Characteristic);
-  blePeripheral.addAttribute(motor4Characteristic);
+  blePeripheral.addAttribute(motorCharacteristic);
+
+  // assign event handlers for connected, disconnected to peripheral
+  blePeripheral.setEventHandler(BLEConnected, blePeripheralConnectHandler);
+  blePeripheral.setEventHandler(BLEDisconnected, blePeripheralDisconnectHandler);
+
+  // assign event handlers for characteristic
+  motorCharacteristic.setEventHandler(BLEWritten, motorCharacteristicWritten);
 
   // begin initialization
   blePeripheral.begin();
@@ -57,41 +58,41 @@ void setup() {
 }
 
 void loop() {
-  BLECentral central = blePeripheral.central();
-
-  if (central) {
-    // central connected to peripheral
-    Serial.print(F("Connected to central: "));
-    Serial.println(central.address());
-
-    while (central.connected()) {
-      // central still connected to peripheral
-      if (motor1Characteristic.written()) {
-        updateMotorSpeed(motor1, motor1Characteristic.value());
-      }
-
-      if (motor2Characteristic.written()) {
-        updateMotorSpeed(motor2, motor2Characteristic.value());
-      }
-
-      if (motor3Characteristic.written()) {
-        updateMotorSpeed(motor3, motor3Characteristic.value());
-      }
-
-      if (motor4Characteristic.written()) {
-        updateMotorSpeed(motor4, motor4Characteristic.value());
-      }
-    }
-
-    // central disconnected
-    Serial.print(F("Disconnected from central: "));
-    Serial.println(central.address());
-  }
+  // poll peripheral
+  blePeripheral.poll();
 }
 
-void updateMotorSpeed(Servo& motor, char speed) {
-  int microSeconds = map(speed, -128, 127, 1000, 2000);
+void blePeripheralConnectHandler(BLECentral& central) {
+  // central connected event handler
+  Serial.print(F("Connected event, central: "));
+  Serial.println(central.address());
 
-  motor.writeMicroseconds(microSeconds);
+  setMotorSpeeds(0);
+}
+
+void blePeripheralDisconnectHandler(BLECentral& central) {
+  // central disconnected event handler
+  Serial.print(F("Disconnected event, central: "));
+  Serial.println(central.address());
+
+  setMotorSpeeds(0);
+}
+
+void motorCharacteristicWritten(BLECentral& central, BLECharacteristic& characteristic) {
+  // central wrote new value to characteristic
+  Serial.print(F("Characteristic event, writen: "));
+
+  setMotorSpeeds(motorCharacteristic.value());
+}
+
+
+void setMotorSpeeds(unsigned long motorSpeeds) {
+  char speeds[NUM_MOTORS];
+
+   memcpy(&speeds, &motorSpeeds, sizeof(speeds));
+  
+  for (int i = 0; i < NUM_MOTORS; i++) {
+    motors[i].setSpeed(speeds[i]);
+  }
 }
 
